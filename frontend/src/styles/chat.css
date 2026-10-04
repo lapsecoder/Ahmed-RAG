@@ -1,0 +1,499 @@
+/* Ask Ahmed - chat styles.
+ *
+ * Built from the portfolio's own vocabulary, not a new design system.
+ * `--paper`, `--card`, `--line`, `--ink-soft`, `--muted`, `--accent-ink`,
+ * `--font-display`, `--font-mono` and the existing `.wrap` / `.eyebrow` /
+ * `.lede` / `.card` / `.pill` / `.rule` conventions all come from tokens.css,
+ * which is imported verbatim.
+ *
+ * The organising idea is an *interview transcript*, not a chat window. The
+ * portfolio is an editorial site, so the conversation reads as a document:
+ * a small monospace speaker label, a hairline rule between turns, prose set in
+ * the body face. No bubbles, no avatars, no gradients, no glow, no glass.
+ * Silence is part of the design - generous whitespace does the separating.
+ */
+
+.ask-page {
+  padding: 56px 0 96px;
+}
+
+/* ---------------------------------------------------------------- masthead */
+
+.ask-header {
+  max-width: 720px;
+  margin-bottom: 40px;
+}
+
+.ask-header h1 {
+  font-size: clamp(42px, 6vw, 68px);
+  margin: 0 0 16px;
+}
+
+.ask-header .lede {
+  max-width: 60ch;
+}
+
+/* A short, factual scope line. The visitor should know immediately that this
+   is a grounded assistant about one person, not a general chatbot. */
+.ask-scope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ------------------------------------------------------------------- thread */
+
+.thread {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+
+/* Before the first question there is no transcript, so the thread's top rule
+   would otherwise float in the middle of the page as a stray hairline. */
+.thread:empty {
+  border-top: 0;
+}
+
+.turn {
+  padding: 26px 0 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.turn:last-child {
+  border-bottom: 0;
+}
+
+.speaker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+.turn[data-role='user'] .speaker {
+  color: var(--accent-ink);
+}
+
+.turn-body {
+  max-width: 68ch;
+}
+
+.turn-body p {
+  margin: 0 0 12px;
+}
+
+.turn-body p:last-child {
+  margin-bottom: 0;
+}
+
+.turn-body ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.turn-body li {
+  margin-bottom: 6px;
+}
+
+.turn-body li:last-child {
+  margin-bottom: 0;
+}
+
+/* The composer answers in extracted sentences, one per line, each prefixed
+   with a dash. That is the backend's format and it reads well as prose, so it
+   is kept rather than reflowed into arbitrary markup. */
+.answer-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.answer-lines li {
+  position: relative;
+  padding-left: 20px;
+  margin-bottom: 8px;
+}
+
+.answer-lines li:last-child {
+  margin-bottom: 0;
+}
+
+.answer-lines li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.72em;
+  width: 8px;
+  height: 1px;
+  background: var(--accent);
+}
+
+/* ------------------------------------------------------------------ sources */
+
+.sources {
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sources-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 2px;
+}
+
+.source {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink-soft);
+  padding: 5px 11px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* The section is secondary detail; it is shown smaller and quieter than the
+   document name so the name stays the scannable part. */
+.source-section {
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------- states */
+
+.state {
+  border-left: 2px solid var(--line-strong);
+  padding: 2px 0 2px 18px;
+  color: var(--ink-soft);
+  max-width: 62ch;
+}
+
+.state-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+
+/* Off-topic and blocked read as a quiet editorial aside, never as an alarm.
+   There is no red, no warning icon and no modal: the refusal is part of the
+   conversation, and dramatising it would misrepresent what happened. */
+.state[data-state='off_topic'],
+.state[data-state='blocked'] {
+  border-left-color: var(--line-strong);
+}
+
+.state[data-state='no_context'] {
+  border-left-color: var(--moss);
+}
+
+/* A backend failure is the one state that should read as a technical problem,
+   and it is signalled with the portfolio's existing accent - not with red. */
+.state[data-state='error'] {
+  border-left-color: var(--accent);
+  color: var(--ink);
+}
+
+/* ------------------------------------------------------------------ loading */
+
+/* Three quiet dots. They are a real pending indicator tied to a real request,
+   not a fake typing animation: there is no streaming to imitate. */
+.dots {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 3px 0;
+}
+
+.dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--line-strong);
+  animation: ask-pulse 1.1s ease-in-out infinite;
+}
+
+.dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes ask-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dots span {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
+/* Visually hidden but available to assistive technology. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------------------------------------------------------------- composer */
+
+.composer-wrap {
+  margin-top: 32px;
+  border-top: 1px solid var(--line-strong);
+  padding-top: 24px;
+}
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 10px 10px 16px;
+  transition: border-color 0.2s ease;
+}
+
+.composer:focus-within {
+  border-color: var(--line-strong);
+}
+
+.composer textarea {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  resize: none;
+  font: inherit;
+  font-size: 15.5px;
+  line-height: 1.55;
+  color: var(--ink);
+  padding: 8px 0;
+  max-height: 180px;
+  min-height: 24px;
+}
+
+.composer textarea:focus {
+  outline: none;
+}
+
+.composer textarea::placeholder {
+  color: var(--muted);
+}
+
+/* The send button uses the portfolio's solid treatment: ink fill, paper text,
+   999px radius. Disabled simply drops the fill rather than greying out, which
+   keeps the resting state of the composer calm. */
+.send {
+  flex-shrink: 0;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  font: inherit;
+  font-weight: 600;
+  font-size: 14.5px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.send:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.send:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+}
+
+.composer-hint {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.composer-hint kbd {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 5px;
+  background: var(--card);
+}
+
+/* The log is the scroll container; the jump link only appears once the
+   conversation has actually grown past the viewport. */
+.thread-scroll {
+  max-height: min(62vh, 640px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.thread-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.thread-scroll::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+}
+
+.thread-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.jump {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  color: var(--accent-ink);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.jump[hidden] {
+  display: none;
+}
+
+/* ------------------------------------------------------------- empty + util */
+
+.ask-empty {
+  padding: 34px 0 8px;
+}
+
+.ask-empty h2 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  margin: 0 0 14px;
+}
+
+.ask-empty ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  max-width: 620px;
+}
+
+.suggestion {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 15px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 13px 16px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.suggestion:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin-top: 34px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+/* `arrow-link` is an anchor style in the portfolio; here it is a button, so
+   the browser's default chrome has to be taken off before the class applies. */
+button.arrow-link {
+  background: none;
+  border: 0;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+  padding: 0;
+}
+
+button.arrow-link:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.toolbar-note {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+  max-width: 62ch;
+}
+
+/* ------------------------------------------------------------------ mobile */
+
+@media (max-width: 900px) {
+  .ask-page {
+    padding: 36px 0 72px;
+  }
+
+  .thread-scroll {
+    /* On a phone the page itself scrolls; a nested scroll area would trap
+       the gesture and fight the browser's own momentum. */
+    max-height: none;
+    overflow: visible;
+  }
+
+  .turn-body,
+  .state {
+    max-width: none;
+  }
+
+  .composer {
+    padding: 8px 8px 8px 14px;
+  }
+
+  .send {
+    padding: 10px 16px;
+  }
+}

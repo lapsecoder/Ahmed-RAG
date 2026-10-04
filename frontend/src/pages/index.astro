@@ -1,0 +1,89 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { SUGGESTIONS } from '../lib/suggestions';
+---
+
+<BaseLayout
+  title="Ask Ahmed"
+  description="A grounded assistant about Ahmed's work, projects, skills, education and interests, answering only from his portfolio knowledge base."
+>
+  <header class="ask-header">
+    <p class="eyebrow">Ask Ahmed</p>
+    <h1 class="display">A grounded assistant<br />about my work.</h1>
+    <p class="lede">
+      A grounded assistant about my work, projects, skills, education and
+      interests. Every answer is quoted from a fixed set of documents &mdash;
+      there is no guesswork, and no general-purpose AI behind it.
+    </p>
+    <ul class="ask-scope" aria-label="What this assistant covers">
+      <li class="pill">Work &amp; projects</li>
+      <li class="pill">Skills</li>
+      <li class="pill">Education</li>
+      <li class="pill">Interests</li>
+      <li class="pill">Availability</li>
+    </ul>
+  </header>
+
+  <section class="ask-empty" data-empty hidden={false}>
+    <h2>Try asking</h2>
+    <ul>
+      {
+        SUGGESTIONS.map((question) => (
+          <li>
+            <button class="suggestion" type="button" data-suggestion={question}>
+              {question}
+            </button>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  {/* The transcript. `aria-live="polite"` announces new answers without
+      interrupting the user mid-typing, and `role="log"` tells assistive
+      technology this region accumulates entries. */}
+  <div
+    class="thread-scroll"
+    data-scroll-region
+    tabindex="0"
+    role="log"
+    aria-live="polite"
+    aria-label="Conversation"
+  >
+    <div class="thread" data-thread></div>
+  </div>
+
+  <button class="jump" type="button" data-jump hidden>Jump to newest ↓</button>
+
+  <div class="composer-wrap">
+    <form class="composer" data-composer>
+      <label class="sr-only" for="ask-input">Your question</label>
+      <textarea
+        id="ask-input"
+        data-input
+        rows="1"
+        placeholder="Ask something about Ahmed..."
+        autocomplete="off"
+        spellcheck="true"
+        enterkeyhint="send"></textarea>
+      <button class="send" type="submit" data-send disabled>Send</button>
+    </form>
+    <p class="composer-hint">
+      <kbd>Enter</kbd> to send &middot; <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new
+      line
+    </p>
+    <p class="toolbar">
+      <span class="toolbar-note"
+        >Answers are quoted from documented sources. When the record is silent,
+        this says so rather than guessing.</span
+      >
+      <button class="arrow-link" type="button" data-clear>
+        Clear conversation
+      </button>
+    </p>
+  </div>
+
+  <script>
+    import '../scripts/chat';
+  </script>
+</BaseLayout>

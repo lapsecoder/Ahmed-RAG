@@ -1,0 +1,86 @@
+[project]
+name = "ahmed-rag"
+version = "0.1.0"
+description = "Local-first, injection-resistant RAG backend for Ahmed's portfolio assistant"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "numpy>=1.26",
+    "faiss-cpu>=1.8",
+    "httpx>=0.27",
+    "sentence-transformers>=2.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+ahmed-rag = "app.main:run"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-q --strict-markers --strict-config"
+markers = [
+    "integration: live tests that require a running Ollama server (opt-in)",
+    "slow: tests that load a real model or write a large index",
+]
+filterwarnings = ["error::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["app", "tests"]
+extend-exclude = ["storage", "knowledge_base"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # bugbear
+    "UP",  # pyupgrade
+    "SIM", # simplify
+    "C4",  # comprehensions
+    "RUF", # ruff-specific
+]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI's dependency-injection idiom is literally "call Depends in the default".
+"app/api/routes.py" = ["B008"]
+# The injection detector must recognise curly quotes, so they are not typos.
+"app/security/injection.py" = ["RUF001"]
+"tests/**" = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+# 3.12 is the floor: the installed NumPy stubs use PEP 695 `type` statements,
+# which mypy can only parse when targeting 3.12 or newer.
+python_version = "3.12"
+files = ["app"]
+strict = true
+warn_unreachable = true
+disallow_any_explicit = false
+plugins = []
+
+[[tool.mypy.overrides]]
+module = ["faiss.*", "sentence_transformers.*"]
+ignore_missing_imports = true
