@@ -157,6 +157,11 @@ class Settings(BaseSettings):
 
     # Embeddings.
     embedding_model: str = Field(default="sentence-transformers/all-MiniLM-L6-v2")
+    #: Directory holding the committed ONNX graph and tokenizer. The weights are
+    #: the same ``all-MiniLM-L6-v2`` checkpoint PyTorch used, exported to ONNX
+    #: so the runtime needs ~60 MB of inference library instead of PyTorch's
+    #: multi-gigabyte CUDA stack.
+    onnx_model_dir: Path = Field(default=Path("models/all-MiniLM-L6-v2"))
 
     # Local Ollama.
     ollama_base_url: str = Field(default="http://localhost:11434")
@@ -182,7 +187,7 @@ class Settings(BaseSettings):
     max_message_chars: int = Field(default=2000, gt=0)
     topic_keywords: tuple[str, ...] = Field(default=DEFAULT_TOPIC_KEYWORDS)
 
-    @field_validator("kb_dir", "index_dir", mode="before")
+    @field_validator("kb_dir", "index_dir", "onnx_model_dir", mode="before")
     @classmethod
     def _expand_path(cls, value: object) -> object:
         if isinstance(value, str):

@@ -13,3 +13,5 @@ storage/
 
 # local end-to-end evaluation report
 .e2e-report.json
+
+.vercel

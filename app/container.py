@@ -27,7 +27,7 @@ from app.services.answering.composer import AnswerComposer
 from app.services.answering.corpus import build_profile
 from app.services.bm25 import Bm25Index
 from app.services.chat import ChatService
-from app.services.embedder import Embedder, SentenceTransformerEmbedder
+from app.services.embedder import Embedder, OnnxMiniLMEmbedder
 from app.services.hybrid_retriever import HybridRetriever
 from app.services.knowledge_base import (
     build_index_from_directory,
@@ -105,7 +105,10 @@ def build_container(
     classifier = QueryClassifier(detector, settings.topic_keywords)
     output_validator = OutputValidator()
 
-    embedder = embedder or SentenceTransformerEmbedder(settings.embedding_model)
+    embedder = embedder or OnnxMiniLMEmbedder(
+        settings.embedding_model,
+        model_dir=settings.onnx_model_dir,
+    )
     store, index_result, manifest, reused = _prepare_store(settings, embedder, build_from_directory)
 
     bm25 = Bm25Index(store.chunks)

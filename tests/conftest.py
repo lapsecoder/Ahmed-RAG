@@ -9,8 +9,6 @@ store tests are meant to pin down.
 from __future__ import annotations
 
 import hashlib
-import sys
-import types
 from collections.abc import Iterator
 from typing import Any
 
@@ -111,58 +109,73 @@ def unit_vector(values: list[float]) -> np.ndarray:
     return vector.astype(np.float32)
 
 
-class FakeSentenceTransformer:
-    """Stand-in for ``sentence_transformers.SentenceTransformer``.
+class FakeEncoding:
+    """One tokenised row, matching what ``tokenizers`` hands back."""
 
-    Installed into ``sys.modules`` by the embedder tests so the production
-    class can be exercised without downloading anything.
+    def __init__(self, ids: list[int], type_ids: list[int] | None = None) -> None:
+        self.ids = ids
+        self.type_ids = type_ids if type_ids is not None else [0] * len(ids)
+
+
+class FakeTokenizer:
+    """Stand-in for ``tokenizers.Tokenizer``.
+
+    Deterministic token ids derived from the text, so a test can assert on what
+    was passed through without a real vocabulary.
     """
 
-    def __init__(self, model_name: str, dimension: int = 4) -> None:
-        self.model_name = model_name
+    def __init__(self) -> None:
+        self.truncation: int | None = None
+        self.padding_disabled = False
+        self.encode_calls: list[list[str]] = []
+
+    def enable_truncation(self, max_length: int) -> None:
+        self.truncation = max_length
+
+    def no_padding(self) -> None:
+        self.padding_disabled = True
+
+    def encode_batch(self, texts: list[str]) -> list[FakeEncoding]:
+        self.encode_calls.append(list(texts))
+        out = []
+        for text in texts:
+            ids = [(sum(ord(char) for char in text) + index) % 30_000 + 1 for index in range(3)]
+            out.append(FakeEncoding(ids))
+        return out
+
+
+class FakeOnnxSession:
+    """Stand-in for ``onnxruntime.InferenceSession``.
+
+    Returns token vectors that are identical across the sequence, so mean
+    pooling over the attention mask returns exactly the vector under test and a
+    failure points at pooling rather than at the pooling input.
+    """
+
+    def __init__(self, dimension: int = 4) -> None:
         self.dimension = dimension
-        self.encode_calls: list[dict[str, Any]] = []
+        self.run_calls: list[dict[str, np.ndarray]] = []
         self.override: np.ndarray | None = None
 
-    def get_sentence_embedding_dimension(self) -> int:
-        """Real models expose the dimension like this."""
-        return self.dimension
-
-    def encode(self, texts: list[str], **kwargs: Any) -> np.ndarray:
-        """Deterministic un-normalised output, so the caller must normalise."""
-        self.encode_calls.append({"texts": list(texts), **kwargs})
+    def run(self, output_names: list[str], feed: dict[str, np.ndarray]) -> list[np.ndarray]:
+        self.run_calls.append({key: np.array(value) for key, value in feed.items()})
+        batch = int(feed["input_ids"].shape[0])
+        sequence = int(feed["input_ids"].shape[1])
         if self.override is not None:
-            return self.override
-        rows = []
-        for text in texts:
-            base = float(sum(ord(char) for char in text) % 97) + 1.0
-            rows.append([base * (index + 1) for index in range(self.dimension)])
-        return np.asarray(rows, dtype=np.float32)
+            return [self.override]
+        hidden = np.zeros((batch, sequence, self.dimension), dtype=np.float32)
+        for row in range(batch):
+            # Deterministic per-row value derived from the first token id, so the
+            # mean-pooled output is a real, distinct vector per input row.
+            base = float(int(feed["input_ids"][row, 0]) % 97) + 1.0
+            hidden[row, :, :] = base
+        return [hidden]
 
 
 @pytest.fixture
-def fake_model() -> FakeSentenceTransformer:
-    """A ready-made fake model object for injection."""
-    return FakeSentenceTransformer("injected/model")
-
-
-@pytest.fixture
-def fake_sentence_transformer(
-    monkeypatch: pytest.MonkeyPatch,
-) -> Iterator[list[FakeSentenceTransformer]]:
-    """Install a fake ``sentence_transformers`` module for the duration of a test."""
-    created: list[FakeSentenceTransformer] = []
-
-    def factory(name: str, *args: Any, **kwargs: Any) -> FakeSentenceTransformer:
-        instance = FakeSentenceTransformer(name)
-        created.append(instance)
-        return instance
-
-    module = types.ModuleType("sentence_transformers")
-    module.SentenceTransformer = factory  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "sentence_transformers", module)
-    yield created
-    sys.modules.pop("sentence_transformers", None)
+def fake_onnx_model() -> tuple[FakeOnnxSession, FakeTokenizer]:
+    """A ready-made ``(session, tokenizer)`` pair for injection."""
+    return FakeOnnxSession(), FakeTokenizer()
 
 
 # --------------------------------------------------------------------------- #

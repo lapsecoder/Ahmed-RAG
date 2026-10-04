@@ -20,7 +20,8 @@ POST /api/chat  ->  classify  ->  retrieve  ->  fence  ->  compose  ->  vet  -> 
 
 > **Sole runtime model:** `sentence-transformers/all-MiniLM-L6-v2`, used only to embed
 > the corpus and the query so FAISS can find candidate chunks. It never writes a word
-> of an answer.
+> of an answer. It runs through **ONNX Runtime** from a graph committed under
+> `models/all-MiniLM-L6-v2/` — see [Deployment](#deployment).
 
 ---
 
@@ -77,7 +78,7 @@ app/
     output_validator.py       Leak detection + safe replacement
   services/
     chunker.py                Markdown sectioning, code-fence safety, real overlap
-    embedder.py               float32 L2-normalised embeddings (MiniLM)
+    embedder.py               ONNX Runtime all-MiniLM-L6-v2, float32 L2-normalised
     vector_store.py           FAISS IndexFlatIP + DocumentChunk metadata
     retriever.py              Thresholded dense retrieval
     bm25.py                   Lexical index: idf, term frequencies, scoped vocabulary
@@ -98,7 +99,8 @@ app/
 
 frontend/                     Astro UI ("Ask Ahmed") — separate npm package
 knowledge_base/               The corpus itself, committed to this repository
-tests/                        872 pytest tests
+models/all-MiniLM-L6-v2/      The committed ONNX graph and tokenizer
+tests/                        881 pytest tests
 ```
 
 ### The pipeline, step by step
@@ -172,10 +174,15 @@ rather than blindly matched.
 pip install -e ".[dev]"     # runtime + pytest/ruff/mypy
 ```
 
+The runtime needs `onnxruntime` and `tokenizers`, both of which ship Windows,
+Linux and macOS wheels, so local development and deployment install the same
+things.
+
 No API keys are needed or accepted. Nothing else has to be running.
 
-> Startup builds the object graph, so if `sentence-transformers` is missing the app
-> fails fast with a typed `DependencyMissingError` rather than starting half-configured.
+> Startup builds the object graph, so if `onnxruntime` or the committed model files are
+> missing the app fails fast with a typed `DependencyMissingError` or `EmbeddingError`
+> rather than starting half-configured.
 
 ---
 
@@ -276,6 +283,7 @@ Every setting is an environment variable with the `AHMED_RAG_` prefix, or a line
 | `AHMED_RAG_INDEX_DIR` | `storage/index` | Persisted FAISS index, chunk metadata and manifest |
 | `AHMED_RAG_KB_EXCLUDE_GLOBS` | `.*,drafts/**,_drafts/**,exports/**,*.tmp.md,*~` | Comma-separated globs never indexed; empty value indexes everything |
 | `AHMED_RAG_EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | Retrieval only. Runs on CPU |
+| `AHMED_RAG_ONNX_MODEL_DIR` | `models/all-MiniLM-L6-v2` | Directory holding `model.onnx` and `tokenizer.json` |
 | `AHMED_RAG_SIMILARITY_THRESHOLD` | `0.35` | Below this, the answer is "no information" |
 | `AHMED_RAG_RETRIEVAL_TOP_K` | `5` | Candidates fetched before thresholding |
 | `AHMED_RAG_CHUNK_MAX_CHARS` | `1200` | Character budget per chunk |
@@ -344,10 +352,10 @@ of a half-written mixture.
 
 ## 6. Tests
 
-**872 pytest tests, all passing**, plus **98 frontend tests (vitest, 4 files)**.
+**881 pytest tests, all passing**, plus **98 frontend tests (vitest, 4 files)**.
 
 ```bash
-pytest -q                        # 872 passed
+pytest -q                        # 881 passed
 ruff check .
 mypy                             # strict, app/ only
 
@@ -409,7 +417,56 @@ provider path only, since that path is no longer wired into the request pipeline
 
 ---
 
-## 7. Design decisions worth defending
+## 7. Deployment
+
+The backend runs on Vercel's Python runtime as a single serverless function.
+`api/index.py` re-exports the FastAPI app unchanged; `vercel.json` bundles the
+model and the corpus.
+
+### Why the embedder is ONNX
+
+The original runtime used `sentence-transformers`, which requires `torch`, and
+on Linux `torch` pulls in the entire CUDA stack — `nvidia-cudnn`, `nvidia-nccl`,
+`cuda-toolkit`, `triton` — for a workload that is pure CPU. That produced a
+**5.6 GB** bundle against Vercel's 500 MB function limit.
+
+`models/all-MiniLM-L6-v2/model.onnx` is the *same checkpoint*, exported offline
+to ONNX and committed. Measured against the PyTorch implementation over the 90
+real knowledge-base chunks and 15 real queries:
+
+| Metric | Result |
+| --- | --- |
+| Token id mismatches | 0 |
+| Maximum absolute element-wise difference | `2.0e-07` |
+| Maximum cosine error | `1.2e-07` |
+| Identical top-1 nearest neighbour | 90/90 |
+| Byte-identical end-to-end answers | 20/20 |
+
+`tests/test_embedder.py` pins two of those vectors, captured from the PyTorch
+implementation, so the committed graph cannot drift silently.
+
+### Measured bundle
+
+Real `manylinux` x86_64 / cp312 wheel resolution, unpacked:
+
+| Component | Size |
+| --- | --- |
+| 26 dependency wheels | 201.6 MB |
+| `models/all-MiniLM-L6-v2` | 87.3 MB |
+| `knowledge_base/` + `app/` | 0.4 MB |
+| **Total** | **289.3 MB** — 58% of the 500 MB limit |
+
+### The faiss-cpu pin
+
+`faiss-cpu` is pinned to `>=1.15,<2`. Linux resolves 1.15.1 as a `cp310-abi3`
+manylinux wheel while 1.12.0 — the version local development had settled on —
+publishes no such wheel, so the two platforms silently disagreed. 1.15 is the
+first release with a stable ABI on both Linux and Windows, so the floor is
+raised to it rather than pinning two divergent versions.
+
+---
+
+## 8. Design decisions worth defending
 
 **No model at request time.** This is the central decision and everything else follows
 from it. Removing generation removes hallucination, removes prompt injection *into* a
@@ -457,21 +514,25 @@ messages and output replacement are all deterministic rules.
 
 ---
 
-## 8. Limitations
+## 9. Limitations
 
 Honest scope, on purpose:
 
-- **Deployment is not defined yet.** This repository documents how to run the backend
-  and the frontend locally; how it is hosted is not settled, and no deployment
-  configuration is claimed here.
+- **Deployment is configured, not battle-tested.** `vercel.json` and `api/index.py`
+  are in place and the bundle is measured to fit, but no deployment has been run
+  end to end and the function's duration and memory ceilings have not been
+  exercised on Vercel.
 - The corpus is one person's portfolio content, and the routing vocabulary, co-answer
   rules and on-topic rules are tuned for it. A second subject would need its own corpus
   profile and routing vocabulary.
 - Chunking is character-budget based, not tokenizer based. With no generation step there
   is no context window to overflow, so this is a retrieval-granularity choice rather
-  than a hard limit.
-- The embedding dimension is discovered from the loaded model; a saved index built with
-  a different model is rebuilt, not migrated.
+  than a hard limit.- The embedding dimension is discovered from the loaded model; a saved index built
+  with a different model is rebuilt, not migrated. An index built by the previous
+  PyTorch embedder is *reused* rather than rebuilt, which is safe only because the
+  two encoders agree to 1e-07 — delete `storage/index/` to force a clean rebuild.
+- The ONNX graph is 87 MB in the repository, which is unusual for a code repo. It is
+  required for the deployment to be self-contained and network-free.
 - Saving an index is atomic per file, not across files. A crash between the three
   `os.replace` calls can leave a newer `index.faiss` beside older metadata — which the
   next startup detects and repairs by rebuilding, but only after an unclean shutdown.

@@ -62,7 +62,14 @@ def test_the_real_knowledge_base_evaluation_passes() -> None:
 
     # The headline numbers are asserted as well, so a future change cannot make
     # the evaluation pass by testing nothing.
-    assert "passed                  : 56" in report
+    #
+    # Every case in the evaluation must pass, not a historical subset: the suite
+    # is 75 queries wide and a partial pass is a failure, so the number is the
+    # total. It was previously written as 56, which no longer described the
+    # suite -- the evaluation passed 75/75 under both the PyTorch and the ONNX
+    # encoder, so the literal was stale rather than anything having regressed.
+    assert "queries                 : 75" in report
+    assert "passed                  : 75" in report
     assert "failed                  : 0" in report
     assert "grounding violations    : 0" in report
     assert "source-retrieval accuracy: 100.0%" in report
